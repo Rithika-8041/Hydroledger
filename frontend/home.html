@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HydroLedger</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#010c18}
+body{font-family:'Outfit',sans-serif;color:#f0f9ff;display:flex;align-items:center;justify-content:center;position:relative}
+#bg-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+#ripple-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.vignette{position:fixed;top:0;left:0;width:100%;height:100%;z-index:3;background:radial-gradient(ellipse 70% 70% at 50% 50%,transparent 50%,rgba(1,12,24,.85) 100%);pointer-events:none}
+.scanline{position:fixed;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,rgba(34,211,238,.12),transparent);z-index:4;animation:scan 5s linear infinite;pointer-events:none}
+@keyframes scan{0%{top:-2px}100%{top:100%}}
+.ring-wrap{position:fixed;top:50%;left:50%;z-index:2;pointer-events:none}
+.ring{position:absolute;border-radius:50%;border:1px solid rgba(34,211,238,.12);transform:translate(-50%,-50%);animation:ringExpand 7s ease-out infinite}
+.ring:nth-child(1){width:280px;height:280px;animation-delay:0s}
+.ring:nth-child(2){width:520px;height:520px;animation-delay:1.75s}
+.ring:nth-child(3){width:760px;height:760px;animation-delay:3.5s}
+.ring:nth-child(4){width:1000px;height:1000px;animation-delay:5.25s}
+@keyframes ringExpand{0%{opacity:.6;transform:translate(-50%,-50%) scale(.15)}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+.hero{position:relative;z-index:10;text-align:center;padding:40px;max-width:760px}
+.logo-wrap{margin-bottom:40px;animation:riseUp 1s .1s cubic-bezier(.16,1,.3,1) both;opacity:0}
+.drop-svg{width:72px;height:72px;filter:drop-shadow(0 0 24px rgba(34,211,238,.8)) drop-shadow(0 0 48px rgba(34,211,238,.35));animation:dropPulse 3s ease-in-out infinite}
+@keyframes dropPulse{0%,100%{filter:drop-shadow(0 0 24px rgba(34,211,238,.8)) drop-shadow(0 0 48px rgba(34,211,238,.35))}50%{filter:drop-shadow(0 0 36px rgba(34,211,238,1)) drop-shadow(0 0 72px rgba(34,211,238,.55))}}
+.title-wrap{margin-bottom:20px;animation:riseUp 1s .25s cubic-bezier(.16,1,.3,1) both;opacity:0}
+h1{font-size:clamp(54px,9vw,100px);font-weight:800;line-height:.92;letter-spacing:-4px}
+.title-main{background:linear-gradient(135deg,#ffffff 0%,#a5f3fc 30%,#22d3ee 60%,#0ea5e9 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;background-size:200%;animation:gradShift 5s ease infinite}
+@keyframes gradShift{0%,100%{background-position:0%}50%{background-position:100%}}
+.title-sub{display:block;font-size:clamp(10px,1.6vw,13px);font-weight:300;letter-spacing:9px;text-transform:uppercase;color:rgba(148,163,184,.6);margin-top:14px;font-family:'DM Mono',monospace}
+.desc{font-size:clamp(14px,1.8vw,17px);color:rgba(148,163,184,.75);line-height:1.85;max-width:500px;margin:0 auto 48px;font-weight:300;animation:riseUp 1s .4s cubic-bezier(.16,1,.3,1) both;opacity:0}
+.desc em{color:#a5f3fc;font-style:normal;font-weight:500}
+.cta-wrap{animation:riseUp 1s .55s cubic-bezier(.16,1,.3,1) both;opacity:0}
+.cta{display:inline-flex;align-items:center;gap:12px;padding:18px 46px;border-radius:100px;background:transparent;border:1px solid rgba(34,211,238,.35);color:#fff;font-weight:600;font-size:15px;font-family:'Outfit',sans-serif;cursor:pointer;position:relative;overflow:hidden;transition:all .35s;letter-spacing:.5px}
+.cta-glow{position:absolute;inset:0;border-radius:100px;background:linear-gradient(135deg,rgba(34,211,238,.12),rgba(14,165,233,.06));opacity:0;transition:opacity .35s}
+.cta-sweep{position:absolute;top:0;left:-110%;width:80%;height:100%;background:linear-gradient(90deg,transparent,rgba(34,211,238,.18),transparent);transition:left .55s}
+.cta:hover{border-color:rgba(34,211,238,.75);box-shadow:0 0 50px rgba(34,211,238,.22),0 0 100px rgba(34,211,238,.08);transform:translateY(-2px)}
+.cta:hover .cta-glow{opacity:1}
+.cta:hover .cta-sweep{left:110%}
+.cta:active{transform:scale(.98)}
+.cta-icon{width:18px;height:18px;transition:transform .3s;flex-shrink:0}
+.cta:hover .cta-icon{transform:translateX(5px)}
+@keyframes riseUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<canvas id="ripple-canvas"></canvas>
+<div class="vignette"></div>
+<div class="scanline"></div>
+<div class="ring-wrap">
+  <div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div>
+</div>
+
+<div class="hero">
+  <div class="logo-wrap">
+    <svg class="drop-svg" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="dg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#a5f3fc"/>
+          <stop offset="50%" stop-color="#22d3ee"/>
+          <stop offset="100%" stop-color="#0284c7"/>
+        </linearGradient>
+        <linearGradient id="sg" x1="10%" y1="5%" x2="50%" y2="60%">
+          <stop offset="0%" stop-color="white" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="white" stop-opacity="0"/>
+        </linearGradient>
+        <radialGradient id="rg" cx="60%" cy="30%" r="50%">
+          <stop offset="0%" stop-color="white" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="white" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <path d="M36 5 C36 5 11 30 11 45 C11 58.8 22.3 67 36 67 C49.7 67 61 58.8 61 45 C61 30 36 5 36 5Z" fill="url(#dg)"/>
+      <path d="M36 5 C36 5 11 30 11 45 C11 58.8 22.3 67 36 67 C49.7 67 61 58.8 61 45 C61 30 36 5 36 5Z" fill="url(#sg)"/>
+      <path d="M36 5 C36 5 11 30 11 45 C11 58.8 22.3 67 36 67 C49.7 67 61 58.8 61 45 C61 30 36 5 36 5Z" fill="url(#rg)"/>
+      <ellipse cx="27" cy="34" rx="5" ry="10" fill="white" opacity="0.25" transform="rotate(-18 27 34)"/>
+      <ellipse cx="36" cy="63" rx="11" ry="3.5" fill="white" opacity="0.12"/>
+    </svg>
+  </div>
+
+  <div class="title-wrap">
+    <h1><span class="title-main">HydroLedger</span></h1>
+    <span class="title-sub">Smart Water Monitoring & Billing</span>
+  </div>
+
+  <p class="desc">
+    Every drop counts. <em>Monitor usage</em>, catch leaks before they drain your wallet, and let bills <em>write themselves</em> — one building at a time.
+  </p>
+
+  <div class="cta-wrap">
+    <button class="cta" onclick="window.location.href='index.html'">
+      <span class="cta-glow"></span>
+      <span class="cta-sweep"></span>
+      Monitor Water Usage
+      <svg class="cta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+const bg = document.getElementById('bg-canvas');
+const bgCtx = bg.getContext('2d');
+bg.width = window.innerWidth;
+bg.height = window.innerHeight;
+
+// Deep water radial background
+function drawBg(){
+  const g = bgCtx.createRadialGradient(bg.width/2,bg.height*.4,0,bg.width/2,bg.height*.4,bg.width*.9);
+  g.addColorStop(0,'#012030');
+  g.addColorStop(.4,'#010e1c');
+  g.addColorStop(1,'#010810');
+  bgCtx.fillStyle=g;
+  bgCtx.fillRect(0,0,bg.width,bg.height);
+}
+
+// Light shafts from top
+const shafts = Array.from({length:6},(_,i)=>({
+  x: bg.width*(i*.18+.08),
+  w: 30+Math.random()*50,
+  alpha: .025+Math.random()*.03,
+  phase: Math.random()*Math.PI*2,
+  speed: .008+Math.random()*.006
+}));
+
+// Bubbles rising
+const bubbles = Array.from({length:40},()=>({
+  x: Math.random()*bg.width,
+  y: bg.height+Math.random()*300,
+  r: Math.random()*3.5+.8,
+  vy: Math.random()*.7+.25,
+  wobble: Math.random()*Math.PI*2,
+  ws: Math.random()*.025+.005,
+  alpha: Math.random()*.35+.08
+}));
+
+// Floating particles
+const pts = Array.from({length:90},()=>({
+  x:Math.random()*bg.width, y:Math.random()*bg.height,
+  r:Math.random()*.9+.2,
+  vx:(Math.random()-.5)*.18, vy:(Math.random()-.5)*.18,
+  alpha:Math.random()*.12+.03
+}));
+
+let tick=0;
+function frame(){
+  tick+=.01;
+  drawBg();
+
+  // Shafts
+  shafts.forEach(s=>{
+    const sway = Math.sin(tick*s.speed+s.phase)*40;
+    const g2 = bgCtx.createLinearGradient(s.x+sway,0,s.x+sway,bg.height*.75);
+    g2.addColorStop(0,`rgba(34,211,238,${s.alpha*1.8})`);
+    g2.addColorStop(.6,`rgba(14,165,233,${s.alpha})`);
+    g2.addColorStop(1,'rgba(2,132,199,0)');
+    bgCtx.save();
+    bgCtx.beginPath();
+    bgCtx.moveTo(s.x+sway-s.w/2,0);
+    bgCtx.lineTo(s.x+sway+s.w/2,0);
+    bgCtx.lineTo(s.x+sway+s.w*.25,bg.height*.75);
+    bgCtx.lineTo(s.x+sway-s.w*.25,bg.height*.75);
+    bgCtx.closePath();
+    bgCtx.fillStyle=g2;
+    bgCtx.fill();
+    bgCtx.restore();
+  });
+
+  // Particles
+  pts.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<0)p.x=bg.width; if(p.x>bg.width)p.x=0;
+    if(p.y<0)p.y=bg.height; if(p.y>bg.height)p.y=0;
+    bgCtx.save();
+    bgCtx.globalAlpha=p.alpha*(0.7+0.3*Math.sin(tick*2+p.x));
+    bgCtx.beginPath();
+    bgCtx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    bgCtx.fillStyle='#22d3ee';
+    bgCtx.fill();
+    bgCtx.restore();
+  });
+
+  // Bubbles
+  bubbles.forEach(b=>{
+    b.y-=b.vy; b.wobble+=b.ws; b.x+=Math.sin(b.wobble)*.6;
+    if(b.y<-10){b.y=bg.height+10;b.x=Math.random()*bg.width;}
+    bgCtx.save();
+    bgCtx.globalAlpha=b.alpha;
+    bgCtx.beginPath();
+    bgCtx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    bgCtx.strokeStyle='rgba(34,211,238,.7)';
+    bgCtx.lineWidth=.6;
+    bgCtx.stroke();
+    bgCtx.beginPath();
+    bgCtx.arc(b.x-b.r*.28,b.y-b.r*.28,b.r*.32,0,Math.PI*2);
+    bgCtx.fillStyle='rgba(255,255,255,.45)';
+    bgCtx.fill();
+    bgCtx.restore();
+  });
+
+  requestAnimationFrame(frame);
+}
+frame();
+
+// Interactive ripples
+const rc = document.getElementById('ripple-canvas');
+const rCtx = rc.getContext('2d');
+rc.width=window.innerWidth; rc.height=window.innerHeight;
+const ripples=[];
+let lastR=0;
+
+document.addEventListener('mousemove',e=>{
+  const now=Date.now();
+  if(now-lastR>100){lastR=now;ripples.push({x:e.clientX,y:e.clientY,r:0,max:60+Math.random()*40,alpha:.35,spd:1.8+Math.random()});}
+});
+document.addEventListener('click',e=>{
+  for(let i=0;i<4;i++) ripples.push({x:e.clientX,y:e.clientY,r:0,max:100+i*70,alpha:.5,spd:2+i*.6});
+});
+
+function rframe(){
+  rCtx.clearRect(0,0,rc.width,rc.height);
+  for(let i=ripples.length-1;i>=0;i--){
+    const r=ripples[i];
+    r.r+=r.spd; r.alpha=.4*(1-r.r/r.max);
+    if(r.r>=r.max){ripples.splice(i,1);continue;}
+    rCtx.save();
+    rCtx.globalAlpha=r.alpha;
+    rCtx.beginPath();
+    rCtx.arc(r.x,r.y,r.r,0,Math.PI*2);
+    rCtx.strokeStyle='rgba(34,211,238,1)';
+    rCtx.lineWidth=1;
+    rCtx.stroke();
+    rCtx.restore();
+  }
+  requestAnimationFrame(rframe);
+}
+rframe();
+
+window.addEventListener('resize',()=>{
+  bg.width=rc.width=window.innerWidth;
+  bg.height=rc.height=window.innerHeight;
+});
+</script>
+</body>
+</html>

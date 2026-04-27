@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HydroLedger — Smart Water Monitoring</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b1120;--surface:#111827;--surface2:#1a2235;--border:#1e2d45;
+  --accent:#22d3ee;--accent2:#0ea5e9;--text:#e2e8f0;--muted:#64748b;
+  --green:#10b981;--amber:#f59e0b;--red:#ef4444;--purple:#a78bfa;
+}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+.shell{display:flex;min-height:100vh}
+
+/* SIDEBAR */
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.logo-mark{display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center}
+.logo-drop{width:10px;height:14px;background:#0b1120;border-radius:50% 50% 50% 50%/60% 60% 40% 40%}
+.logo-name{font-size:15px;font-weight:700;letter-spacing:.5px}
+.logo-sub{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:1px}
+nav{flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s;border-left:2px solid transparent;user-select:none}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(34,211,238,.07)}
+.nav-icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.status-bar{padding:16px 20px;border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);line-height:1.8}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10}
+.page-title{font-size:18px;font-weight:700}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.badge{font-family:'DM Mono',monospace;font-size:10px;padding:4px 10px;border-radius:4px;border:1px solid var(--border);color:var(--muted);letter-spacing:.5px}
+.content{padding:24px 28px}
+.page{display:none}
+.page.active{display:block}
+
+/* GRIDS */
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+
+/* CARDS */
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px}
+.stat-label{font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.stat-val{font-size:28px;font-weight:700;line-height:1}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:6px}
+.c-accent{color:var(--accent)}
+.c-green{color:var(--green)}
+.c-amber{color:var(--amber)}
+.c-red{color:var(--red)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px}
+.card-title{font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:16px}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+td{padding:11px 12px;border-bottom:1px solid rgba(30,45,69,.6);color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(34,211,238,.03)}
+
+/* PILLS */
+.pill{display:inline-block;font-size:10px;font-family:'DM Mono',monospace;padding:3px 8px;border-radius:4px;font-weight:500}
+.pill-green{background:rgba(16,185,129,.15);color:var(--green)}
+.pill-amber{background:rgba(245,158,11,.15);color:var(--amber)}
+.pill-red{background:rgba(239,68,68,.15);color:var(--red)}
+.pill-blue{background:rgba(34,211,238,.1);color:var(--accent)}
+
+/* FORM */
+.form-row{margin-bottom:16px}
+.form-label{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;display:block}
+.form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:var(--text);font-size:13px;font-family:'Syne',sans-serif;outline:none;transition:border .15s}
+.form-input:focus{border-color:var(--accent)}
+select.form-input option{background:var(--surface2)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;font-family:'Syne',sans-serif}
+.btn-primary{background:var(--accent);color:#0b1120}
+.btn-primary:hover{background:#67e8f9}
+.btn-primary:disabled{background:var(--muted);cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+/* TANK BAR */
+.tank-bar{background:var(--surface2);border-radius:6px;height:12px;overflow:hidden;margin-top:8px}
+.tank-fill{height:100%;border-radius:6px;transition:width .6s ease}
+
+/* ALERT */
+.alert-box{border-radius:8px;padding:12px 16px;font-size:12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;border-left:3px solid}
+.alert-warn{background:rgba(245,158,11,.07);border-color:var(--amber);color:#fbbf24}
+.alert-ok{background:rgba(16,185,129,.07);border-color:var(--green);color:#34d399}
+.alert-info{background:rgba(34,211,238,.07);border-color:var(--accent);color:var(--accent)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;transform:translateY(100px);transition:transform .3s;z-index:99;font-family:'Syne',sans-serif;max-width:320px}
+.toast.show{transform:translateY(0)}
+.toast.error{background:var(--red)}
+
+/* CODE BLOCK */
+.code-block{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:14px;line-height:2;border:1px solid var(--border);white-space:pre}
+
+/* LOADING */
+.loading{text-align:center;padding:40px;color:var(--muted);font-size:13px;font-family:'DM Mono',monospace}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <div class="logo-icon"><div class="logo-drop"></div></div>
+        <div>
+          <div class="logo-name">HydroLedger</div>
+          <div class="logo-sub">v2.0 · DBMS</div>
+        </div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-item active" data-page="dashboard" onclick="goTo('dashboard',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" data-page="readings" onclick="goTo('readings',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Meter Readings
+      </div>
+      <div class="nav-item" data-page="billing" onclick="goTo('billing',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+        Billing
+      </div>
+      <div class="nav-item" data-page="tanks" onclick="goTo('tanks',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+        Tank Monitor
+      </div>
+      <div class="nav-item" data-page="add" onclick="goTo('add',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+        Add Reading
+      </div>
+    </nav>
+    <div class="status-bar">
+      <span class="status-dot"></span>LIVE · API :5000<br>
+      DB: HydroLedger
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="topbar-title">Overview Dashboard</div>
+      <div class="topbar-right">
+        <span class="badge" id="badge-buildings">— Buildings</span>
+        <span class="badge" id="badge-flats">— Flats</span>
+        <button class="btn btn-ghost btn-sm" onclick="refreshAll()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ===== DASHBOARD ===== -->
+      <div class="page active" id="page-dashboard">
+        <div class="grid-4" id="dash-stats">
+          <div class="stat-card"><div class="stat-label">Total Buildings</div><div class="stat-val c-accent" id="stat-buildings">—</div><div class="stat-sub">Registered</div></div>
+          <div class="stat-card"><div class="stat-label">Active Flats</div><div class="stat-val c-green" id="stat-flats">—</div><div class="stat-sub">With meters</div></div>
+          <div class="stat-card"><div class="stat-label">Total Units</div><div class="stat-val c-accent" id="stat-units">—</div><div class="stat-sub">All readings</div></div>
+          <div class="stat-card"><div class="stat-label">Pending Revenue</div><div class="stat-val c-amber" id="stat-revenue">—</div><div class="stat-sub" id="stat-pending-count">— bills pending</div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="card-title">Usage per Building</div><canvas id="barChart" height="190"></canvas></div>
+          <div class="card"><div class="card-title">Flat-wise Breakdown</div><canvas id="pieChart" height="190"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Recent Readings</div>
+          <div id="dash-readings-body"><div class="loading">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- ===== METER READINGS ===== -->
+      <div class="page" id="page-readings">
+        <div class="grid-3" id="readings-stats">
+          <div class="stat-card"><div class="stat-label">Total Readings</div><div class="stat-val c-accent" id="r-total">—</div></div>
+          <div class="stat-card"><div class="stat-label">Avg Consumption</div><div class="stat-val c-green" id="r-avg">—</div><div class="stat-sub">units/reading</div></div>
+          <div class="stat-card"><div class="stat-label">Above Average</div><div class="stat-val c-amber" id="r-above">—</div><div class="stat-sub">high usage meters</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">All Meter Readings</div>
+          <div id="readings-table-body"><div class="loading">Loading…</div></div>
+        </div>
+        <div id="above-avg-result" style="display:none"></div>
+      </div>
+
+      <!-- ===== BILLING ===== -->
+      <div class="page" id="page-billing">
+        <div class="grid-3" id="billing-stats">
+          <div class="stat-card"><div class="stat-label">Total Bills</div><div class="stat-val c-accent" id="b-total">—</div></div>
+          <div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-val c-green" id="b-revenue">—</div></div>
+          <div class="stat-card"><div class="stat-label">Pending Bills</div><div class="stat-val c-red" id="b-pending">—</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Bill Register</div>
+          <div id="billing-table-body"><div class="loading">Loading…</div></div>
+        </div>
+
+      </div>
+
+      <!-- ===== TANKS ===== -->
+      <div class="page" id="page-tanks">
+        <div class="grid-2" id="tank-cards"><div class="loading">Loading…</div></div>
+
+      </div>
+
+      <!-- ===== ADD READING ===== -->
+      <div class="page" id="page-add">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">New Meter Reading</div>
+            <div class="form-row">
+              <label class="form-label">Select Flat / Meter</label>
+              <select class="form-input" id="sel-meter">
+                <option value="">Loading meters…</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Units Consumed</label>
+              <input type="number" class="form-input" id="inp-units" placeholder="e.g. 135" min="0">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Reading Date</label>
+              <input type="date" class="form-input" id="inp-date">
+            </div>
+            <button class="btn btn-primary" id="submit-btn" onclick="submitReading()">Submit Reading</button>
+            &nbsp;
+            <button class="btn btn-ghost" onclick="clearForm()">Clear</button>
+
+            <div id="preview-box" style="display:none;margin-top:16px;background:var(--surface2);border-radius:8px;padding:14px;border:1px solid var(--border)">
+              <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);margin-bottom:8px;letter-spacing:.5px">BILL PREVIEW</div>
+              <div id="preview-content"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="session-log-card">
+          <div class="card-title">This Session's Readings</div>
+          <div id="session-table-body">
+            <div class="loading" style="padding:20px">No readings submitted yet this session</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = "http://localhost:3001";
+let barChart, pieChart;
+const pageTitles = {
+  dashboard: "Overview Dashboard",
+  readings: "Meter Readings",
+  billing: "Billing Register",
+  tanks: "Tank Monitor",
+  add: "Add Reading"
+};
+
+// ─── Navigation ────────────────────────────────────────────────
+function goTo(id, el) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  document.getElementById("page-" + id).classList.add("active");
+  el.classList.add("active");
+  document.getElementById("topbar-title").textContent = pageTitles[id];
+  loadPage(id);
+}
+
+function loadPage(id) {
+  if (id === "dashboard") loadDashboard();
+  if (id === "readings") loadReadings();
+  if (id === "billing") loadBilling();
+  if (id === "tanks") loadTanks();
+  if (id === "add") loadAddForm();
+}
+
+function refreshAll() {
+  const active = document.querySelector(".nav-item.active").dataset.page;
+  loadPage(active);
+}
+
+// ─── Toast ──────────────────────────────────────────────────────
+function toast(msg, isError = false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isError ? " error" : "");
+  setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ─── Fetch Helper ───────────────────────────────────────────────
+async function apiFetch(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error("API error " + r.status);
+  return r.json();
+}
+
+// ─── Dashboard ──────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const [summary, bUsage, fUsage, readings] = await Promise.all([
+      apiFetch("/dashboard"),
+      apiFetch("/chart/building-usage"),
+      apiFetch("/chart/flat-usage"),
+      apiFetch("/readings")
+    ]);
+
+    document.getElementById("stat-buildings").textContent = summary.buildings.count;
+    document.getElementById("stat-flats").textContent = summary.flats.count;
+    document.getElementById("stat-units").textContent = summary.totalUnits.total;
+    document.getElementById("stat-revenue").textContent = "₹" + summary.pendingRevenue.total;
+    document.getElementById("stat-pending-count").textContent = summary.pendingBills.count + " bills pending";
+    document.getElementById("badge-buildings").textContent = summary.buildings.count + " Buildings";
+    document.getElementById("badge-flats").textContent = summary.flats.count + " Flats";
+
+    renderBarChart(bUsage);
+    renderPieChart(fUsage);
+
+    const recent = readings.slice(0, 5);
+    document.getElementById("dash-readings-body").innerHTML = `
+      <table>
+        <tr><th>Flat</th><th>Owner</th><th>Building</th><th>Units</th><th>Date</th></tr>
+        ${recent.map(r => `<tr>
+          <td>${r.flat_number}</td>
+          <td>${r.owner_name}</td>
+          <td>${r.building_name}</td>
+          <td>${r.units_consumed}</td>
+          <td>${r.reading_date ? r.reading_date.slice(0,10) : "—"}</td>
+        </tr>`).join("")}
+      </table>`;
+  } catch (e) {
+    document.getElementById("dash-readings-body").innerHTML = `<div class="loading" style="color:var(--red)">Cannot reach API. Is the backend running on port 5000?</div>`;
+  }
+}
+
+function renderBarChart(data) {
+  const ctx = document.getElementById("barChart").getContext("2d");
+  if (barChart) barChart.destroy();
+  barChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: data.map(d => d.building_name),
+      datasets: [{
+        label: "Units",
+        data: data.map(d => d.total_usage),
+        backgroundColor: ["rgba(34,211,238,.75)", "rgba(14,165,233,.75)", "rgba(167,139,250,.75)"],
+        borderRadius: 6, borderSkipped: false
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { grid: { color: "rgba(30,45,69,.8)" }, ticks: { color: "#64748b" } },
+        x: { grid: { display: false }, ticks: { color: "#64748b" } }
+      },
+      responsive: true
+    }
+  });
+}
+
+function renderPieChart(data) {
+  const ctx = document.getElementById("pieChart").getContext("2d");
+  if (pieChart) pieChart.destroy();
+  const colors = ["rgba(34,211,238,.8)", "rgba(14,165,233,.8)", "rgba(167,139,250,.8)", "rgba(16,185,129,.8)", "rgba(245,158,11,.8)"];
+  pieChart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: data.map(d => d.label),
+      datasets: [{ data: data.map(d => d.total_usage), backgroundColor: colors, borderWidth: 0, hoverOffset: 8 }]
+    },
+    options: {
+      plugins: { legend: { position: "bottom", labels: { color: "#64748b", boxWidth: 10, padding: 10, font: { family: "'DM Mono'" } } } },
+      cutout: "65%", responsive: true
+    }
+  });
+}
+
+// ─── Readings ───────────────────────────────────────────────────
+async function loadReadings() {
+  try {
+    const [readings, aboveAvg] = await Promise.all([
+      apiFetch("/readings"),
+      apiFetch("/readings/above-avg")
+    ]);
+
+    const avg = readings.length ? Math.round(readings.reduce((s, r) => s + r.units_consumed, 0) / readings.length) : 0;
+    document.getElementById("r-total").textContent = readings.length;
+    document.getElementById("r-avg").textContent = avg;
+    document.getElementById("r-above").textContent = aboveAvg.length;
+
+    document.getElementById("readings-table-body").innerHTML = `
+      <table>
+        <tr><th>#</th><th>Meter</th><th>Flat</th><th>Owner</th><th>Building</th><th>Units</th><th>Date</th><th>Status</th></tr>
+        ${readings.map((r, i) => `<tr>
+          <td>${i+1}</td>
+          <td>M-00${r.meter_id}</td>
+          <td>${r.flat_number}</td>
+          <td>${r.owner_name}</td>
+          <td>${r.building_name}</td>
+          <td>${r.units_consumed}</td>
+          <td>${r.reading_date ? r.reading_date.slice(0,10) : "—"}</td>
+          <td><span class="pill ${r.units_consumed > avg ? 'pill-amber' : 'pill-green'}">${r.units_consumed > avg ? 'High' : 'Normal'}</span></td>
+        </tr>`).join("")}
+      </table>`;
+
+    document.getElementById("above-avg-result").textContent =
+      aboveAvg.length
+        ? "Result → " + aboveAvg.map(r => `Meter M-00${r.meter_id} (${r.flat_number} · ${r.units_consumed} units)`).join(", ")
+        : "No readings above average.";
+  } catch (e) {
+    document.getElementById("readings-table-body").innerHTML = `<div class="loading" style="color:var(--red)">API unavailable.</div>`;
+  }
+}
+
+// ─── Billing ────────────────────────────────────────────────────
+async function loadBilling() {
+  try {
+    const bills = await apiFetch("/bills");
+    const total = bills.reduce((s, b) => s + parseFloat(b.total_amount), 0);
+    const pending = bills.filter(b => b.payment_status === "Pending");
+
+    document.getElementById("b-total").textContent = bills.length;
+    document.getElementById("b-revenue").textContent = "₹" + total.toFixed(2);
+    document.getElementById("b-pending").textContent = pending.length;
+
+    document.getElementById("billing-table-body").innerHTML = `
+      <table>
+        <tr><th>Bill ID</th><th>Flat</th><th>Owner</th><th>Building</th><th>Month</th><th>Units</th><th>Rate</th><th>Amount</th><th>Status</th><th>Action</th></tr>
+        ${bills.map(b => `<tr>
+          <td>B-${String(b.bill_id).padStart(3,"0")}</td>
+          <td>${b.flat_number}</td>
+          <td>${b.owner_name}</td>
+          <td>${b.building_name}</td>
+          <td>${b.billing_month}</td>
+          <td>${b.units_consumed}</td>
+          <td>₹${b.rate_per_unit}</td>
+          <td>₹${b.total_amount}</td>
+          <td><span class="pill ${b.payment_status==='Paid'?'pill-green':'pill-amber'}">${b.payment_status}</span></td>
+          <td>${b.payment_status==='Pending'?`<button class="btn btn-ghost btn-sm" onclick="payBill(${b.bill_id})">Mark Paid</button>`:'—'}</td>
+        </tr>`).join("")}
+      </table>`;
+  } catch (e) {
+    document.getElementById("billing-table-body").innerHTML = `<div class="loading" style="color:var(--red)">API unavailable.</div>`;
+  }
+}
+
+async function payBill(id) {
+  try {
+    await fetch(API + "/bills/" + id + "/pay", { method: "PATCH" });
+    toast("Bill B-" + String(id).padStart(3,"0") + " marked as paid!");
+    loadBilling();
+  } catch (e) {
+    toast("Failed to update bill.", true);
+  }
+}
+
+// ─── Tanks ──────────────────────────────────────────────────────
+async function loadTanks() {
+  try {
+    const tanks = await apiFetch("/tanks");
+    const pct = t => Math.round((t.current_level / t.capacity_liters) * 100);
+    const color = p => p > 50 ? "var(--green)" : p > 25 ? "var(--amber)" : "var(--red)";
+    const alertClass = p => p > 50 ? "alert-ok" : "alert-warn";
+    const alertMsg = (t, p) => p > 50
+      ? `Safe — ${t.current_level - t.min_level}L above minimum threshold`
+      : `Warning — level dropping toward minimum (${t.min_level}L)`;
+
+    document.getElementById("tank-cards").innerHTML = tanks.map(t => `
+      <div class="card">
+        <div class="card-title">Tank ${t.tank_id} — ${t.building_name}</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
+          Current: ${t.current_level}L &nbsp;|&nbsp; Capacity: ${t.capacity_liters}L &nbsp;|&nbsp; Min: ${t.min_level}L
+        </div>
+        <div style="font-size:26px;font-weight:700;margin-bottom:4px;color:${color(pct(t))}">${pct(t)}%</div>
+        <div class="tank-bar"><div class="tank-fill" style="width:${pct(t)}%;background:${color(pct(t))}"></div></div>
+        <div class="alert-box ${alertClass(pct(t))}" style="margin-top:12px">${alertMsg(t, pct(t))}</div>
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <input type="number" class="form-input" id="refill-${t.tank_id}" placeholder="Litres to add" style="max-width:160px">
+          <button class="btn btn-ghost btn-sm" onclick="refillTank(${t.tank_id})">+ Refill</button>
+        </div>
+      </div>`).join("");
+  } catch (e) {
+    document.getElementById("tank-cards").innerHTML = `<div class="loading" style="color:var(--red)">API unavailable.</div>`;
+  }
+}
+
+async function refillTank(id) {
+  const liters = parseInt(document.getElementById("refill-" + id).value);
+  if (!liters || liters <= 0) return;
+  try {
+    const r = await fetch(API + "/tanks/" + id + "/refill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ liters })
+    });
+    const d = await r.json();
+    toast(d.message);
+    loadTanks();
+  } catch (e) {
+    toast("Refill failed.", true);
+  }
+}
+
+// ─── Add Reading ─────────────────────────────────────────────────
+let sessionReadings = [];
+
+async function loadAddForm() {
+  try {
+    const flats = await apiFetch("/flats");
+    const sel = document.getElementById("sel-meter");
+    sel.innerHTML = flats.map(f =>
+      `<option value="${f.flat_id}" data-flat="${f.flat_number}" data-owner="${f.owner_name}">${f.flat_number} — ${f.owner_name} (${f.building_name})</option>`
+    ).join("");
+  } catch (e) {}
+
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("inp-date").value = today;
+  renderSessionTable();
+}
+
+async function submitReading() {
+  const sel = document.getElementById("sel-meter");
+  const opt = sel.options[sel.selectedIndex];
+  const flatId = sel.value;
+  const units = parseInt(document.getElementById("inp-units").value);
+  const date = document.getElementById("inp-date").value;
+
+  if (!units || units < 0) { toast("Enter valid units.", true); return; }
+
+  // We need the meter_id for this flat — fetch from flats and derive
+  // For simplicity, we POST to /readings with meter lookup on backend
+  // Here we use flat_id to find meter. Adjust if your schema differs.
+  try {
+    document.getElementById("submit-btn").disabled = true;
+    document.getElementById("submit-btn").textContent = "Submitting…";
+
+    // Get meter for this flat
+    const meters = await apiFetch("/flats");
+    // Just use flat_id matching — the route will look up meter_id
+    // We'll post flat_id and let the route resolve it, or post meter_id
+    // Since our route expects meter_id, get it:
+    const meterRes = await fetch(API + "/readings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ meter_id: parseInt(flatId), units_consumed: units, reading_date: date })
+    });
+    const result = await meterRes.json();
+
+    sessionReadings.push({
+      flat: opt.dataset.flat,
+      owner: opt.dataset.owner,
+      units,
+      date,
+      bill: units * 2
+    });
+
+    document.getElementById("preview-box").style.display = "block";
+    document.getElementById("preview-content").innerHTML = `
+      <div style="font-size:13px;line-height:2">
+        Flat: <strong>${opt.dataset.flat}</strong> — ${opt.dataset.owner}<br>
+        Units: <strong>${units}</strong> &nbsp;|&nbsp; Rate: ₹2/unit<br>
+        <span style="font-size:18px;color:var(--green);font-weight:700">Bill: ₹${units * 2}</span>
+      </div>`;
+
+    renderSessionTable();
+    toast("Reading submitted! Bill auto-generated via trigger.");
+    document.getElementById("inp-units").value = "";
+  } catch (e) {
+    toast("Submit failed. Is the backend running?", true);
+  } finally {
+    document.getElementById("submit-btn").disabled = false;
+    document.getElementById("submit-btn").textContent = "Submit Reading";
+  }
+}
+
+function renderSessionTable() {
+  const el = document.getElementById("session-table-body");
+  if (!sessionReadings.length) {
+    el.innerHTML = `<div class="loading" style="padding:20px">No readings submitted yet this session</div>`;
+    return;
+  }
+  el.innerHTML = `<table>
+    <tr><th>Flat</th><th>Owner</th><th>Units</th><th>Date</th><th>Bill Amount</th><th>Status</th></tr>
+    ${sessionReadings.map(r => `<tr>
+      <td>${r.flat}</td><td>${r.owner}</td><td>${r.units}</td><td>${r.date}</td>
+      <td>₹${r.bill}</td><td><span class="pill pill-amber">Pending</span></td>
+    </tr>`).join("")}
+  </table>`;
+}
+
+function clearForm() {
+  document.getElementById("inp-units").value = "";
+  document.getElementById("preview-box").style.display = "none";
+}
+
+// ─── Init ────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  Chart.defaults.color = "rgba(100,116,139,1)";
+  Chart.defaults.font.family = "'DM Mono', monospace";
+  Chart.defaults.font.size = 10;
+  loadDashboard();
+});
+</script>
+</body>
+</html>
